@@ -1,23 +1,23 @@
 {.push raises: [].}
-import pkg/duckdb
 import std/options
 import std/strutils
 import std/httpclient
-import zippy/ziparchives
 import std/os
+import pkg/duckdb
+import zippy/ziparchives
 
 proc downloadDb(data_folder: string = "places_db") =
   try:
+    let url = "https://github.com/primozs/places-db/raw/refs/heads/master/places.zip"
+    echo "Downloading database file: ", url
+
     data_folder.removeDir()
 
     if not data_folder.dirExists():
       data_folder.createDir()
 
     let client = newHttpClient()
-    client.downloadFile(
-      "https://github.com/primozs/places-db/raw/refs/heads/master/places.zip",
-      data_folder / "places.zip"
-    )
+    client.downloadFile(url, data_folder / "places.zip")
 
     extractAll(data_folder / "places.zip", data_folder / "extracted")
     moveFile(data_folder / "extracted" / "places.duckdb", data_folder / "places.duckdb")
@@ -27,7 +27,8 @@ proc downloadDb(data_folder: string = "places_db") =
     defer:
       client.close()
   except Exception as e:
-    echo e.repr()
+    echo e.name, " ", e.msg
+    quit("places should download database places.duckdb", 1)
 
 
 type Places* = object
@@ -39,7 +40,8 @@ proc connectDb(name: string): DuckDBConn =
     let dbConn = connect(name)
     return dbConn
   except Exception as e:
-    echo e.repr
+    echo "Database coonection error: ", e.name, " ", e.msg
+    quit("Places must be able to coonect to database", 1)
 
 
 proc initPlaces*(db: string): Places =
@@ -51,7 +53,8 @@ proc initPlaces*(db: string): Places =
     result.db = db
     result.connection = dbConn
   except Exception as e:
-    echo e.repr()
+    echo "Init places error: ", e.msg, " ", e.msg
+    quit("Places could not be initialized", 1)
 
 type Continent* = object
   continent_code*: string
@@ -70,7 +73,7 @@ proc queryContinent*(p: Places, lon, lat: float): seq[Continent] =
     for item in p.connection.rows(query, lon, lat):
       result.add Continent(continent_code: item[0], continent_name: item[1])
   except Exception as e:
-    echo e.repr()
+    echo "Query continent error: ", e.msg, " ", e.msg
 
 type Country* = object
   country_code*: string
@@ -89,7 +92,7 @@ proc queryCountry*(p: Places, lon, lat: float): seq[Country] =
     for item in p.connection.rows(query, lon, lat):
       result.add Country(country_code: item[0], country_name: item[1])
   except Exception as e:
-    echo e.repr()
+    echo "Query country error: ", e.msg, " ", e.msg
 
 type Region* = object
   country_code*: string
@@ -111,7 +114,7 @@ proc queryRegion*(p: Places, lon, lat: float): seq[Region] =
       result.add Region(country_code: item[0], region_code: item[1],
           region_name: item[2])
   except Exception as e:
-    echo e.repr()
+    echo "Query region error: ", e.msg, " ", e.msg
 
 type PlaceData* = object
   name*: string
@@ -147,7 +150,7 @@ proc queryPlace*(p: Places, lon, lat: float, distance: int = 500): seq[PlaceData
         lat: item[7].parseFloat
       )
   except Exception as e:
-    echo e.repr()
+    echo "Query places error: ", e.msg, " ", e.msg
 
 
 when isMainModule:
